@@ -99,7 +99,7 @@ export class ExcelWorkbookPage {
     await nameBox.click();
     await nameBox.fill(normalisedCellReference);
     await nameBox.press('Enter');
-    await this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(1000);
 
     console.log(
       `Cell ${normalisedCellReference} selected.`
