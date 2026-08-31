@@ -1,0 +1,25 @@
+{
+  "name": "excel-online-today-playwright",
+  "version": "1.0.0",
+  "description": "Playwright end-to-end test for the Excel Online TODAY function",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:chrome": "playwright test --project=excel-chrome",
+    "test:headed": "playwright test --project=excel-chrome --headed",
+    "test:debug": "playwright test --project=excel-chrome --debug",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/luxon": "^3.6.2",
+    "@types/node": "^26.4.0",
+    "dotenv": "^17.2.1",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "luxon": "^3.7.1"
+  }
+}
