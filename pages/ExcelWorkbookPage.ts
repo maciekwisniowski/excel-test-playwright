@@ -106,30 +106,44 @@ export class ExcelWorkbookPage {
     );
   }
   public async enterFormula(): Promise<void> {
-  console.log('Entering formula into A2...');
+    const formula = '=TODAY()';
 
-  await this.selectCell('A2');
+    console.log('Entering formula into A2...');
 
-  // Clear existing value/formula
-  await this.page.keyboard.press('Delete');
+    await this.selectCell('A2');
 
-  const formulaBar = this.excelFrame.getByRole('textbox', {
-    name: 'formula bar',
-  });
+    await this.page.keyboard.press('Delete');
 
-  await expect(formulaBar).toBeVisible({
-    timeout: 30_000,
-  });
+    await this.page.waitForTimeout(500);
 
-  await formulaBar.click();
-  await formulaBar.press('Control+A');
-  await formulaBar.pressSequentially('=TODAY()');
-  await this.page.keyboard.press('Enter');
+    const formulaBar = this.excelFrame
+      .getByRole('textbox', {
+        name: /formula bar/i,
+      })
+      .first();
 
-  console.log('Formula committed.');
-}
+    await expect(formulaBar).toBeVisible({
+      timeout: 30_000,
+    });
 
+    await formulaBar.click();
+    await formulaBar.press('ControlOrMeta+A');
+    await formulaBar.press('Backspace');
 
+    await formulaBar.pressSequentially(formula, {
+      delay: 100,
+    });
+
+    console.log(`Formula entered: ${formula}`);
+
+    await this.page.waitForTimeout(500);
+
+    await formulaBar.press('Enter');
+
+    console.log('Formula committed.');
+
+    await this.page.waitForTimeout(2_000);
+  }
   public async getSelectedCellDisplayedValue():
     Promise<string> {
     return this.getCellDisplayedValue('A2');

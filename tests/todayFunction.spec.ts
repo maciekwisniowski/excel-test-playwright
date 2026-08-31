@@ -1,7 +1,7 @@
-
 import { expect, test } from '@playwright/test';
 import { environment } from '../config/environment';
 import { ExcelWorkbookPage } from '../pages/ExcelWorkbookPage';
+
 import {
   getExpectedDate,
   parseExcelDisplayedDate,
@@ -9,40 +9,58 @@ import {
 } from '../utils/dateUtils';
 
 test.describe('Excel Online TODAY function', () => {
-  test('returns the date on which the test is executed', async ({ page }) => {
-    const workbookPage = new ExcelWorkbookPage(page);
+  test(
+    'returns the date on which the test is executed',
+    async ({ page, context }) => {
+      await context.grantPermissions([
+        'clipboard-read',
+        'clipboard-write',
+      ]);
 
-    await test.step('Open the prepared Excel Online workbook', async () => {
-      await workbookPage.open(environment.excelWorkbookUrl);
-    });
+      const workbookPage =
+        new ExcelWorkbookPage(page);
 
-    await test.step('Enter TODAY formula into cell A2', async () => {
-      await workbookPage.enterFormula();
-    });
+      await test.step(
+        'Open the prepared Excel Online workbook',
+        async () => {
+          await workbookPage.open(
+            environment.excelWorkbookUrl
+          );
+        }
+      );
 
-    await test.step(
-      'Verify that cell A2 contains the current date',
-      async () => {
-        const displayedCellValue =
-          await workbookPage.getSelectedCellDisplayedValue();
+      await test.step(
+        'Enter TODAY formula into cell A2',
+        async () => {
+          await workbookPage.enterFormula();
+        }
+      );
 
-        const expectedDate = getExpectedDate(
-          environment.timeZone
-        );
+      await test.step(
+        'Verify that cell A2 contains the current date',
+        async () => {
+          const displayedCellValue =
+            await workbookPage
+              .getSelectedCellDisplayedValue();
 
-        const actualDate = parseExcelDisplayedDate(
-          displayedCellValue,
-          environment.timeZone
-        );
+          const expectedDate = getExpectedDate(
+            environment.timeZone
+          );
 
-        expect(
-          toComparableDate(actualDate),
-          `Expected TODAY() to return ${toComparableDate(
-            expectedDate
-          )}, but Excel displayed "${displayedCellValue}".`
-        ).toBe(toComparableDate(expectedDate));
-      }
-    );
-  });
+          const actualDate = parseExcelDisplayedDate(
+            displayedCellValue,
+            environment.timeZone
+          );
+
+          expect(
+            toComparableDate(actualDate),
+            `Expected TODAY() to return ` +
+              `${toComparableDate(expectedDate)}, ` +
+              `but Excel displayed ` +
+              `"${displayedCellValue}".`
+          ).toBe(toComparableDate(expectedDate));
+        }
+      );
+    }
+  );
 });
-
