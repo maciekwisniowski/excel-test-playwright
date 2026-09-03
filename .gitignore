@@ -5,3 +5,5 @@ playwright/.auth/*
 
 test-results/
 playwright-report/
+
+.mp4
