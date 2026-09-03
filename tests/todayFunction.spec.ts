@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+
 import { environment } from '../config/environment';
 import { ExcelWorkbookPage } from '../pages/ExcelWorkbookPage';
 
@@ -40,8 +41,7 @@ test.describe('Excel Online TODAY function', () => {
         'Verify that cell A2 contains the current date',
         async () => {
           const displayedCellValue =
-            await workbookPage
-              .getSelectedCellDisplayedValue();
+            await workbookPage.getCellDisplayedValue('A2');
 
           const expectedDate = getExpectedDate(
             environment.timeZone
@@ -58,7 +58,9 @@ test.describe('Excel Online TODAY function', () => {
               `${toComparableDate(expectedDate)}, ` +
               `but Excel displayed ` +
               `"${displayedCellValue}".`
-          ).toBe(toComparableDate(expectedDate));
+          ).toBe(
+            toComparableDate(expectedDate)
+          );
         }
       );
     }

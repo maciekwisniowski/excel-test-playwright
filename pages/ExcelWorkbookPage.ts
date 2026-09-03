@@ -6,6 +6,12 @@ import {
 } from '@playwright/test';
 
 export class ExcelWorkbookPage {
+  private static readonly NAVIGATION_TIMEOUT = 60_000;
+  private static readonly EXCEL_READY_TIMEOUT = 90_000;
+  private static readonly DEFAULT_TIMEOUT = 30_000;
+  private static readonly CELL_SELECTION_TIMEOUT = 10_000;
+  private static readonly CLIPBOARD_TIMEOUT = 5_000;
+
   private readonly excelFrame: FrameLocator;
   private readonly sheetCanvas: Locator;
 
@@ -20,34 +26,25 @@ export class ExcelWorkbookPage {
   }
 
   public async open(workbookUrl: string): Promise<void> {
-    console.log('Opening Excel Online workbook...');
-
     await this.page.goto(workbookUrl, {
       waitUntil: 'domcontentloaded',
-      timeout: 60_000,
+      timeout: ExcelWorkbookPage.NAVIGATION_TIMEOUT,
     });
-
-    console.log(`Current URL: ${this.page.url()}`);
 
     await this.waitUntilReady();
   }
 
   public async waitUntilReady(): Promise<void> {
-    console.log('Waiting for Excel iframe...');
+    const excelIframe = this.page.locator(
+      'iframe[name^="WacFrame_Excel"]'
+    );
 
-    await expect(
-      this.page.locator(
-        'iframe[name^="WacFrame_Excel"]'
-      )
-    ).toBeVisible({
-      timeout: 90_000,
+    await expect(excelIframe).toBeVisible({
+      timeout: ExcelWorkbookPage.EXCEL_READY_TIMEOUT,
     });
 
-    console.log('Excel iframe found.');
-    console.log('Waiting for worksheet canvas...');
-
     await expect(this.sheetCanvas).toBeVisible({
-      timeout: 90_000,
+      timeout: ExcelWorkbookPage.EXCEL_READY_TIMEOUT,
     });
 
     await expect
@@ -68,12 +65,10 @@ export class ExcelWorkbookPage {
         {
           message:
             'Waiting for Excel worksheet canvas to be rendered.',
-          timeout: 90_000,
+          timeout: ExcelWorkbookPage.EXCEL_READY_TIMEOUT,
         }
       )
       .toBe(true);
-
-    console.log('Excel worksheet canvas is ready.');
   }
 
   public async selectCell(
@@ -82,111 +77,132 @@ export class ExcelWorkbookPage {
     const normalisedCellReference =
       cellReference.trim().toUpperCase();
 
-    console.log(
-      `Selecting cell ${normalisedCellReference}...`
-    );
-
-    const nameBox = this.excelFrame
-      .locator(
-        'input[aria-label*="Name Box"], input[aria-label*="Nazwa"]'
-      )
-      .first();
+    const nameBox = this.getNameBox();
 
     await expect(nameBox).toBeVisible({
-      timeout: 30_000,
+      timeout: ExcelWorkbookPage.DEFAULT_TIMEOUT,
     });
 
     await nameBox.click();
-    await nameBox.fill(normalisedCellReference);
-    await nameBox.press('Enter');
-    await this.page.waitForTimeout(1000);
 
-    console.log(
-      `Cell ${normalisedCellReference} selected.`
-    );
+    await nameBox.fill(normalisedCellReference);
+
+    await nameBox.press('Enter');
+
+
+    await expect(nameBox).not.toBeFocused({
+      timeout: ExcelWorkbookPage.CELL_SELECTION_TIMEOUT,
+    });
   }
+
   public async enterFormula(): Promise<void> {
     const formula = '=TODAY()';
 
-    console.log('Entering formula into A2...');
-
     await this.selectCell('A2');
 
-    await this.page.keyboard.press('Delete');
-
-    await this.page.waitForTimeout(500);
-
-    const formulaBar = this.excelFrame
-      .getByRole('textbox', {
-        name: /formula bar/i,
-      })
-      .first();
+    const formulaBar = this.getFormulaBar();
 
     await expect(formulaBar).toBeVisible({
-      timeout: 30_000,
+      timeout: ExcelWorkbookPage.DEFAULT_TIMEOUT,
     });
 
     await formulaBar.click();
+
     await formulaBar.press('ControlOrMeta+A');
+
     await formulaBar.press('Backspace');
 
+ 
     await formulaBar.pressSequentially(formula, {
       delay: 100,
     });
 
-    console.log(`Formula entered: ${formula}`);
-
-    await this.page.waitForTimeout(500);
-
     await formulaBar.press('Enter');
-
-    console.log('Formula committed.');
-
-    await this.page.waitForTimeout(2_000);
-  }
-  public async getSelectedCellDisplayedValue():
-    Promise<string> {
-    return this.getCellDisplayedValue('A2');
   }
 
   public async getCellDisplayedValue(
     cellReference: string
   ): Promise<string> {
-    console.log(
-      `Selecting ${cellReference} to read its value...`
-    );
-
     await this.selectCell(cellReference);
-    await this.page.evaluate(async () => {
-      await navigator.clipboard.writeText('');
-    });
+
+    await this.clearClipboard();
 
     await this.page.keyboard.press('Control+C');
+
+    const clipboardValue =
+      await this.waitForClipboardValue(cellReference);
+
+    return this.normaliseClipboardValue(
+      clipboardValue,
+      cellReference
+    );
+  }
+
+  public async clearCell(
+    cellReference: string
+  ): Promise<void> {
+    await this.selectCell(cellReference);
+
+    await this.page.keyboard.press('Delete');
+  }
+
+  private getNameBox(): Locator {
+    return this.excelFrame
+      .locator(
+        'input[aria-label*="Name Box"], ' +
+        'input[aria-label*="Nazwa"]'
+      )
+      .first();
+  }
+
+  private getFormulaBar(): Locator {
+    return this.excelFrame
+      .getByRole('textbox', {
+        name: /formula bar/i,
+      })
+      .first();
+  }
+
+  private async clearClipboard(): Promise<void> {
+    await this.page.evaluate(() => {
+      return navigator.clipboard.writeText('');
+    });
+  }
+
+  private async readClipboard(): Promise<string> {
+    return this.page.evaluate(() => {
+      return navigator.clipboard.readText();
+    });
+  }
+
+  private async waitForClipboardValue(
+    cellReference: string
+  ): Promise<string> {
+    let clipboardValue = '';
 
     await expect
       .poll(
         async () => {
-          const clipboardValue =
-            await this.page.evaluate(async () => {
-              return navigator.clipboard.readText();
-            });
+          clipboardValue = await this.readClipboard();
 
           return clipboardValue.trim();
         },
         {
+          timeout: ExcelWorkbookPage.CLIPBOARD_TIMEOUT,
           message:
             `Waiting for the value of ${cellReference} ` +
             'to be copied to the clipboard.',
-          timeout: 5_000,
         }
       )
       .not.toBe('');
 
-    const clipboardValue =
-      await this.page.evaluate(async () => {
-        return navigator.clipboard.readText();
-      });
+    return clipboardValue;
+  }
 
+  private normaliseClipboardValue(
+    clipboardValue: string,
+    cellReference: string
+  ): string {
     const normalisedValue = clipboardValue
       .replace(/\r?\n/g, '')
       .replace(/\t/g, '')
@@ -198,24 +214,6 @@ export class ExcelWorkbookPage {
       );
     }
 
-    console.log(
-      `Value copied from ${cellReference}: "${normalisedValue}"`
-    );
-
     return normalisedValue;
-  }
-
-  public async clearCell(
-    cellReference: string
-  ): Promise<void> {
-    console.log(`Clearing cell ${cellReference}...`);
-
-    await this.selectCell(cellReference);
-
-    await this.page.keyboard.press('Delete');
-
-    console.log(
-      `Cell ${cellReference} cleared.`
-    );
   }
 }
