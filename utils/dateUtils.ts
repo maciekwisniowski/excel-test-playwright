@@ -29,19 +29,32 @@ export function parseExcelDisplayedDate(
     .replace(/\s+/g, ' ')
     .trim();
 
-  for (const format of supportedDateFormats) {
-    const parsedDate = DateTime.fromFormat(
-      normalisedValue,
-      format,
-      {
+  const candidates = supportedDateFormats
+    .map((format) =>
+      DateTime.fromFormat(normalisedValue, format, {
         locale: 'en-GB',
         zone: timeZone,
-      }
-    );
+      })
+    )
+    .filter((date) => date.isValid)
+    .map((date) => date.startOf('day'));
 
-    if (parsedDate.isValid) {
-      return parsedDate.startOf('day');
-    }
+  if (candidates.length > 0) {
+    const today = getExpectedDate(timeZone);
+
+    return candidates.reduce((closestDate, candidate) => {
+      const closestDifference = Math.abs(
+        closestDate.diff(today, 'days').days
+      );
+
+      const candidateDifference = Math.abs(
+        candidate.diff(today, 'days').days
+      );
+
+      return candidateDifference < closestDifference
+        ? candidate
+        : closestDate;
+    });
   }
 
   const isoDate = DateTime.fromISO(normalisedValue, {
